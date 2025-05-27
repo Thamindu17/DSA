@@ -44,17 +44,32 @@ class BinarySearchTree{
     }
     
     private TreeNode searchRec(TreeNode tempnode, int value){
-        
-        if(tempnode.key == value || tempnode == null){
+        if (tempnode == null) {
+            return null;
+        }
+        if (tempnode.key == value) {
             return tempnode;
         }
-        
-        if(value < tempnode.key){
+        if (value < tempnode.key) {
             return searchRec(tempnode.left, value);
-        }else if(value > tempnode.key){
+        } else {
             return searchRec(tempnode.right, value);
         }
     }
     
     
 }
+
+public class Tree {
+    public static void main(String[] args) {
+        BinarySearchTree bst = new BinarySearchTree();
+        bst.insert(10);
+        bst.insert(5);
+        bst.insert(15);
+        bst.insert(5);
+        System.out.println(bst.search(10)); // true
+        System.out.println(bst.search(7));  // false
+    }
+}
+
+
