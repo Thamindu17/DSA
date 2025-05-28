@@ -1,0 +1,214 @@
+:- dynamic student/4, course/3, scholarship/2.
+
+% Initial Database Facts
+student(sunil, 20, english, 85).
+student(kamal, 19, mathematics, 92).
+student(peter, 21, physics, 78).
+student(susan, 20, chemistry, 88).
+student(david, 22, english, 90).
+
+course(english, 'Mr. Smith', 4).
+course(mathematics, 'Mr. Johnson', 3).
+course(physics, 'Mr. Brown', 4).
+course(chemistry, 'Mr. Wilson', 3).
+
+scholarship(john, 1000).
+scholarship(mary, 1500).
+scholarship(david, 1200).
+
+% Utility: Read a line as an atom
+read_atom(Prompt, Atom) :-
+    write(Prompt),
+    flush_output,
+    read_line_to_list(Chars),
+    atom_codes(Atom, Chars).
+
+read_line_to_list(Chars) :-
+    get_code(Char),
+    read_line_to_list_aux(Char, Chars).
+
+read_line_to_list_aux(10, []) :- !. % Newline
+read_line_to_list_aux(-1, []) :- !. % EOF
+read_line_to_list_aux(Char, [Char|Rest]) :-
+    get_code(NextChar),
+    read_line_to_list_aux(NextChar, Rest).
+
+% Utility: Read a number with validation
+read_number(Prompt, Number) :-
+    write(Prompt),
+    flush_output,
+    repeat,
+    read_line_to_list(Chars),
+    atom_codes(Atom, Chars),
+    (atom_number(Atom, Number) -> true ;
+        (write('Invalid number! Try again: '), flush_output, fail)).
+
+% Read number without prompt
+read_number(Number) :-
+    repeat,
+    read_line_to_list(Chars),
+    atom_codes(Atom, Chars),
+    (atom_number(Atom, Number) -> true ;
+        (write('Invalid number! Try again: '), flush_output, fail)).
+
+% Negation as failure
+not(P) :- call(P), !, fail.
+not(_).
+
+% Start the program
+start :-
+    write('========================================='), nl,
+    write('    STUDENT MANAGEMENT SYSTEM'), nl,
+    write('========================================='), nl,
+    main_menu.
+
+% Main menu
+main_menu :-
+    nl,
+    write('Choose an option:'), nl,
+    write('1. Add new student'), nl,
+    write('2. Display all students'), nl,
+    write('3. Find student by name'), nl,
+    write('4. Show scholarship students'), nl,
+    write('5. Calculate statistics'), nl,
+    write('6. Grade students'), nl,
+    write('7. Remove student'), nl,
+    write('8. Analyze student record'), nl,
+    write('9. Exit'), nl,
+    write('Enter your choice (1-9): '),
+    flush_output,
+    read_number(Number),
+    process_choice(Number).
+
+% Process menu choices
+process_choice(1) :- !, add_student.
+process_choice(2) :- !, display_all_students.
+process_choice(3) :- !, find_student.
+process_choice(4) :- !, show_scholarship_students.
+process_choice(5) :- !, calculate_statistics.
+process_choice(6) :- !, grade_all_students.
+process_choice(7) :- !, remove_student.
+process_choice(8) :- !, analyze_student.
+process_choice(9) :- !,
+    write('Thank you for using the system!'), nl,
+    write('Goodbye!'), nl.
+process_choice(_) :-
+    write('Invalid choice! Please try again.'), nl,
+    main_menu.
+
+% Core Functionality
+add_student :-
+    read_atom('Enter student name: ', Name),
+    read_number('Enter age: ', Age),
+    read_atom('Enter subject: ', Subject),
+    read_number('Enter marks: ', Marks),
+    (student(Name, _, _, _) ->
+        write('Student already exists!'), nl
+    ;   assertz(student(Name, Age, Subject, Marks)),
+        write('Student added successfully!'), nl),
+    main_menu.
+
+display_all_students :-
+    write('All Students:'), nl,
+    write('Name\t\tAge\tSubject\t\tMarks'), nl,
+    write('----------------------------------------'), nl,
+    (   call(student, Name, Age, Subject, Marks),
+        format('~w\t\t~w\t~w\t~w~n', [Name, Age, Subject, Marks]),
+        fail
+    ;   true),
+    (   call(student, _, _, _, _) -> true
+    ;   write('No students in database.'), nl),
+    main_menu.
+
+find_student :-
+    read_atom('Enter student name: ', Name),
+    (student(Name, Age, Subject, Marks) ->
+        format('Student Found:~nName: ~w~nAge: ~w~nMajor: ~w~nGrade: ~w~n',
+               [Name, Age, Subject, Marks]),
+        (scholarship(Name, Amount) ->
+            format('Scholarship: $~w~n', [Amount])
+        ;   write('No scholarship'), nl)
+    ;   write('Student not found!'), nl),
+    main_menu.
+
+show_scholarship_students :-
+    write('Scholarship Students:'), nl,
+    (bagof(Name-Amount, scholarship(Name, Amount), Students) ->
+        show_scholarship_list(Students)
+    ;   write('No scholarship recipients'), nl),
+    main_menu.
+
+show_scholarship_list([]).
+show_scholarship_list([Name-Amount|Rest]) :-
+    format('~w: $~w~n', [Name, Amount]),
+    show_scholarship_list(Rest).
+
+calculate_statistics :-
+    findall(Marks, call(student, _, _, _, Marks), Marks),
+    (Marks \= [] ->
+        sum_list(Marks, Total),
+        length(Marks, Count),
+        Average is Total / Count,
+        format('Statistics:~nTotal Students: ~w~nAverage Grade: ~1f~n',
+               [Count, Average]),
+        show_subject_distribution
+    ;   write('No students in database'), nl),
+    main_menu.
+
+show_subject_distribution :-
+    setof(Subjects, Name^Age^Marks^student(Name, Age, Subject, Marks), Subjects),
+    write('Major Distribution:'), nl,
+    show_subjects(Subjects).
+
+show_subjects([]).
+show_subjects([Subject|Rest]) :-
+    findall(Name, student(Name, _, Subject, _), Students),
+    length(Students, Count),
+    format('~w: ~w students~n', [Subject, Count]),
+    show_majors(Rest).
+
+grade_all_students :-
+    write('Student Marks:'), nl,
+    write('Name\t\tMarks\tClassification'), nl,
+    write('----------------------------------------'), nl,
+    (   call(student, Name, _, _, Marks),
+        classify_grade(Marks, Classification),
+        format('~w\t\t~w\t~w~n', [Name, Marks, Classification]),
+        fail
+    ;   true),
+    main_menu.
+
+classify_grade(Marks, 'Excellent') :- Marks >= 90, !.
+classify_grade(Marks, 'Good') :- Marks >= 80, !.
+classify_grade(Marks, 'Average') :- Marks >= 70, !.
+classify_grade(Marks, 'Below Average') :- Marks >= 60, !.
+classify_grade(_, 'Fail').
+
+analyze_student :-
+    read_atom('Enter student name to analyze: ', Name),
+    (student(Name, Age, Subject, Marks) ->
+        Term =.. [student, Name, Age, Subject, Marks],
+        functor(Term, Functor, Arity),
+        format('Analysis of ~w:~n', [Name]),
+        format('Functor: ~w, Arity: ~w~n', [Functor, Arity]),
+        arg(1, Term, Arg1),
+        arg(2, Term, Arg2),
+        arg(3, Term, Arg3),
+        arg(4, Term, Arg4),
+        format('Arguments: Name=~w, Age=~w, Major=~w, Grade=~w~n',
+               [Arg1, Arg2, Arg3, Arg4]),
+        (not(scholarship(Name, _)) ->
+            write('This student has no scholarship.'), nl
+        ;   scholarship(Name, Amount),
+            format('Scholarship Amount: $~w~n', [Amount])),
+        (course(Subject, Instructor, Credits) ->
+            format('Course Details: ~w taught by ~w (~w credits)~n',
+                   [Subject, Instructor, Credits])
+        ;   write('No course information available.'), nl)
+    ;   write('Student not found!'), nl),
+    main_menu.
+
+sum_list([], 0).
+sum_list([H|T], Sum) :- sum_list(T, Rest), Sum is H + Rest.
+
+v
